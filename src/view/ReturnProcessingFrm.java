@@ -1,156 +1,199 @@
 package view;
 
-import model.Client;
-import model.ReturnedCostume;
-import model.ReturnedDamage;
-import model.ReturnedReceipt;
-import model.User;
-
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.border.EmptyBorder;
+import model.*;
+import javax.swing.*;
+import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.util.ArrayList;
-import java.util.Date;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
 
 public class ReturnProcessingFrm extends BaseFrm {
     private final User u;
     private final Client clientInfo;
     private final List<ReturnedCostume> returnedItems;
-    private JTable tblReturnedCostume;
-    private JLabel txtTotalRentedCost;
-    private JLabel txtTotalFineFee;
+
+    // Table models
+    private DefaultTableModel processingModel;
+    private DefaultTableModel rentDamageModel;    // existing damage (read-only)
+    private DefaultTableModel processDamageModel; // damage being added this session
 
     public ReturnProcessingFrm(User user, Client client, List<ReturnedCostume> returnedItems) {
-        super("Update Status - Costume Rental System");
+        super("Costume Processing - Return Costume");
         this.u = user;
         this.clientInfo = client;
         this.returnedItems = returnedItems;
         for (ReturnedCostume rc : this.returnedItems) {
-            if (rc.getListReturnedDamage() == null) {
-                rc.setListReturnedDamage(new ArrayList<>());
-            }
+            if (rc.getListReturnedDamage() == null) rc.setListReturnedDamage(new ArrayList<>());
         }
         initComponents();
-        setSize(1000, 700);
+        setSize(1100, 820);
         centerWindow();
-        updateTotals();
     }
 
     private void initComponents() {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(BACKGROUND_COLOR);
 
-        JPanel header = createHeader("Update Costume Status");
-        mainPanel.add(header, BorderLayout.NORTH);
+        // Title
+        JLabel lblTitle = new JLabel("Costume Processing", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.PLAIN, 30));
+        lblTitle.setBorder(new EmptyBorder(25, 0, 10, 0));
+        mainPanel.add(lblTitle, BorderLayout.NORTH);
 
-        JPanel content = new JPanel(new BorderLayout(0, 20));
+        // Scrollable centre
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(BACKGROUND_COLOR);
-        content.setBorder(new EmptyBorder(20, 20, 20, 20));
+        content.setBorder(new EmptyBorder(5, 20, 10, 20));
 
-        JLabel txtReturnedAt = new JLabel("Return Date: " + new Date());
-        txtReturnedAt.setFont(LABEL_FONT);
-        content.add(txtReturnedAt, BorderLayout.NORTH);
+        // ── Client info (1-row table, no heading) ──────────────────────────
+        content.add(buildClientInfoPanel());
+        content.add(Box.createVerticalStrut(12));
 
-        String[] columns = {"Barcode", "Name", "Qty", "Rent Fee", "Fine", "States"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0);
-        tblReturnedCostume = new JTable(model);
-        tblReturnedCostume.setRowHeight(40);
-
-        for (ReturnedCostume ret : returnedItems) {
-            model.addRow(new Object[]{
-                    ret.getRentedCostume().getCostume().getBarcode(),
-                    ret.getRentedCostume().getCostume().getName(),
-                    ret.getQuantity(),
-                    ret.getRentedFee() + " VND", "0 VND", "None"
+        // ── Processing costumes ────────────────────────────────────────────
+        processingModel = new DefaultTableModel(
+            new String[]{"ID","Name","Rented Date","Rented Quantity","Returning Quantity","Total Rented Fee"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        for (ReturnedCostume rc : returnedItems) {
+            processingModel.addRow(new Object[]{
+                rc.getRentedCostume().getCostume().getBarcode(),
+                rc.getRentedCostume().getCostume().getName(),
+                fmtDate(rc.getRentedCostume().getRentedAt()),
+                rc.getRentedCostume().getQuantity(),
+                rc.getQuantity(),
+                rc.getRentedFee()
             });
         }
-        content.add(new JScrollPane(tblReturnedCostume), BorderLayout.CENTER);
+        content.add(buildSection("Processing costumes", processingModel));
+        content.add(Box.createVerticalStrut(12));
 
-        JPanel summaryPanel = new JPanel(new GridLayout(2, 2, 10, 10));
-        summaryPanel.setBackground(Color.WHITE);
-        summaryPanel.setBorder(new EmptyBorder(10, 20, 10, 20));
+        // ── Rented Damage ─────────────────────────────────────────────────
+        rentDamageModel = new DefaultTableModel(
+            new String[]{"Costume ID","Costume Name","Damage name","Damage Costume Quantity","Found Date","Note"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        content.add(buildSection("Rented Damage", rentDamageModel));
+        content.add(Box.createVerticalStrut(12));
 
-        txtTotalRentedCost = new JLabel("Total Rent: 0 VND");
-        txtTotalFineFee = new JLabel("Total Fine: 0 VND");
-        JButton btnAddDamage = createSecondaryButton("Add Damage");
+        // ── Processing Damage ─────────────────────────────────────────────
+        processDamageModel = new DefaultTableModel(
+            new String[]{"Costume ID","Costume Name","Damage name","Damage Costume Quantity","Total Fine Fee","Note"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        content.add(buildSection("Processing Damage", processDamageModel));
 
-        summaryPanel.add(txtTotalRentedCost);
-        summaryPanel.add(txtTotalFineFee);
-        summaryPanel.add(btnAddDamage);
+        mainPanel.add(new JScrollPane(content), BorderLayout.CENTER);
 
-        content.add(summaryPanel, BorderLayout.SOUTH);
-        mainPanel.add(content, BorderLayout.CENTER);
-
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // ── Footer ─────────────────────────────────────────────────────────
+        JPanel footer = new JPanel(new BorderLayout());
         footer.setBackground(BACKGROUND_COLOR);
-        JButton btnCancel = createSecondaryButton("Cancel");
-        JButton btnFinish = createPrimaryButton("Finish");
 
-        btnAddDamage.addActionListener(e -> {
-            int row = tblReturnedCostume.getSelectedRow();
-            if (row != -1) {
-                new AddDamageFrm(this, returnedItems.get(row), row).setVisible(true);
-            } else {
-                JOptionPane.showMessageDialog(this, "Select an item to add damage.");
-            }
-        });
+        // "Add Damage" button aligned left inside footer
+        JPanel leftFooter = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 10));
+        leftFooter.setBackground(BACKGROUND_COLOR);
 
-        btnFinish.addActionListener(e -> {
+        // "Next / Cancel" buttons aligned right
+        JPanel rightFooter = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
+        rightFooter.setBackground(BACKGROUND_COLOR);
+        JButton btnNext   = styledBtn("Next",   new Color(149, 182, 214));
+        JButton btnCancel = styledBtn("Cancel", new Color(228, 234, 240));
+        rightFooter.add(btnNext);
+        rightFooter.add(btnCancel);
+
+        footer.add(leftFooter, BorderLayout.WEST);
+        footer.add(rightFooter, BorderLayout.CENTER);
+        mainPanel.add(footer, BorderLayout.SOUTH);
+
+        // ── Events ────────────────────────────────────────────────────────
+        btnNext.addActionListener(e -> {
             ReturnedReceipt receipt = new ReturnedReceipt();
             receipt.setClient(clientInfo);
             receipt.setUser(u);
             receipt.setReturnedAt(new Date());
             receipt.setListReturnedCostume(returnedItems);
             receipt.calculateTotalReceipt(returnedItems);
-
             new ConfirmFrm(u, receipt).setVisible(true);
-            this.dispose();
+            dispose();
         });
 
         btnCancel.addActionListener(e -> {
             new ClientInfoFrm(u, clientInfo).setVisible(true);
-            this.dispose();
+            dispose();
         });
-
-        footer.add(btnCancel);
-        footer.add(btnFinish);
-        mainPanel.add(footer, BorderLayout.SOUTH);
 
         add(mainPanel);
     }
 
-    public void updateRow(int row) {
-        ReturnedCostume ret = returnedItems.get(row);
-        StringBuilder states = new StringBuilder();
-        for (ReturnedDamage rd : ret.getListReturnedDamage()) {
-            if (states.length() > 0) {
-                states.append(", ");
+    // Called from AddDamageFrm to refresh Processing Damage table
+    public void addDamageRow(ReturnedCostume rc, ReturnedDamage rd) {
+        processDamageModel.addRow(new Object[]{
+            rc.getRentedCostume().getCostume().getBarcode(),
+            rc.getRentedCostume().getCostume().getName(),
+            rd.getDamage().getName(),
+            rd.getQuantity(),
+            rd.getFee() * rd.getQuantity(),
+            rd.getDamage().getNote()
+        });
+        // Refresh total rented fee column in Processing costumes
+        for (int i = 0; i < returnedItems.size(); i++) {
+            if (returnedItems.get(i) == rc) {
+                processingModel.setValueAt(rc.getRentedFee(), i, 5);
             }
-            states.append(rd.getDamage().getName());
         }
-        tblReturnedCostume.setValueAt(ret.getFineFee() + " VND", row, 4);
-        tblReturnedCostume.setValueAt(states.toString(), row, 5);
-        updateTotals();
     }
 
-    private void updateTotals() {
-        float totalRent = 0;
-        float totalFine = 0;
-        for (ReturnedCostume ret : returnedItems) {
-            totalRent += ret.getRentedFee();
-            totalFine += ret.getFineFee();
+    // ── Helpers ───────────────────────────────────────────────────────────
+    private JPanel buildClientInfoPanel() {
+        String[] cols = {"ID","Fullname","Address","Tel","Email","Note"};
+        DefaultTableModel m = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        m.addRow(new Object[]{clientInfo.getId(), clientInfo.getFullname(),
+            clientInfo.getAddress(), clientInfo.getTel(), clientInfo.getEmail(), clientInfo.getNote()});
+        return buildSection(null, m);
+    }
+
+    private JPanel buildSection(String title, DefaultTableModel m) {
+        JTable table = new JTable(m);
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(Color.WHITE);
+        table.setFont(LABEL_FONT);
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(new LineBorder(new Color(180, 195, 210), 1));
+        int rows = Math.min(m.getRowCount() + 1, 5);
+        scroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, rows * 31 + 25));
+
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBackground(BACKGROUND_COLOR);
+        if (title != null) {
+            JLabel lbl = new JLabel(title);
+            lbl.setFont(LABEL_FONT);
+            panel.add(lbl, BorderLayout.NORTH);
         }
-        txtTotalRentedCost.setText("Total Rent: " + totalRent + " VND");
-        txtTotalFineFee.setText("Total Fine: " + totalFine + " VND");
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height + 80));
+        return panel;
+    }
+
+    private JButton styledBtn(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        btn.setBackground(bg);
+        btn.setForeground(TEXT_COLOR);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 200, 220), 1),
+            BorderFactory.createEmptyBorder(10, 40, 10, 40)
+        ));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    private String fmtDate(java.util.Date d) {
+        return d == null ? "" : new java.text.SimpleDateFormat("dd/MM/yyyy").format(d);
     }
 }

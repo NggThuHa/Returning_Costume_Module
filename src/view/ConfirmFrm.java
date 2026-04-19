@@ -1,58 +1,43 @@
 package view;
 
-import dao.CostumeDAO;
-import dao.RentedReceiptDAO;
-import dao.ReturnedReceiptDAO;
-import model.Costume;
-import model.RentedDeposit;
-import model.RentedReceipt;
-import model.ReturnedCostume;
-import model.ReturnedReceipt;
-import model.User;
-
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.SwingConstants;
-import javax.swing.border.EmptyBorder;
+import dao.*;
+import model.*;
+import javax.swing.*;
+import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.Insets;
-import java.util.ArrayList;
+import java.awt.*;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.ArrayList;
 
 public class ConfirmFrm extends BaseFrm {
     private final User u;
     private final ReturnedReceipt returnedReceipt;
-    private final List<RentedDeposit> depositsToRefund;
+    private List<RentedDeposit> depositsToRefund;
 
     public ConfirmFrm(User user, ReturnedReceipt receipt) {
-        super("Confirm Return Receipt");
+        super("Confirmation - Return Costume");
         this.u = user;
         this.returnedReceipt = receipt;
-        receipt.setBarcode("INV-" + (System.currentTimeMillis() % 10000));
 
+        // Collect unreturned deposits for this client
         depositsToRefund = new ArrayList<>();
-        List<RentedReceipt> receipts = new RentedReceiptDAO().searchByClient(receipt.getClient());
-        for (RentedReceipt rentedReceipt : receipts) {
-            if (rentedReceipt.getListRentedDeposit() != null) {
-                for (RentedDeposit rentedDeposit : rentedReceipt.getListRentedDeposit()) {
-                    if (!rentedDeposit.isReturned() && rentedReceipt.isCompleted()) {
-                        depositsToRefund.add(rentedDeposit);
-                    }
+        for (RentedReceipt rr : new RentedReceiptDAO().searchByClient(receipt.getClient())) {
+            if (rr.getListRentedDeposit() != null) {
+                for (RentedDeposit rd : rr.getListRentedDeposit()) {
+                    if (!rd.isReturned()) depositsToRefund.add(rd);
                 }
             }
         }
+        returnedReceipt.setTotalRefundDeposit(
+            depositsToRefund.stream()
+                .mapToDouble(rd -> rd.getDepositItem().getValue() * rd.getQuantity())
+                .reduce(0, Double::sum)
+        );
 
         initComponents();
-        setSize(900, 800);
+        setSize(1100, 870);
         centerWindow();
     }
 
@@ -60,134 +45,205 @@ public class ConfirmFrm extends BaseFrm {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(BACKGROUND_COLOR);
 
-        JPanel header = createHeader("Confirm Invoice / Return Receipt");
-        mainPanel.add(header, BorderLayout.NORTH);
+        // ── Title ──────────────────────────────────────────────────────────
+        JLabel lblTitle = new JLabel("Confirmation", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.PLAIN, 30));
+        lblTitle.setBorder(new EmptyBorder(25, 0, 10, 0));
+        mainPanel.add(lblTitle, BorderLayout.NORTH);
 
-        JPanel content = new JPanel(new GridBagLayout());
+        // ── Scrollable content ─────────────────────────────────────────────
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(BACKGROUND_COLOR);
-        content.setBorder(new EmptyBorder(20, 20, 20, 20));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.fill = GridBagConstraints.BOTH;
-        gbc.weightx = 1;
-        gbc.insets = new Insets(5, 5, 5, 5);
+        content.setBorder(new EmptyBorder(5, 20, 10, 20));
 
-        JPanel infoPanel = new JPanel(new GridLayout(3, 2));
-        infoPanel.setBackground(java.awt.Color.WHITE);
-        infoPanel.add(new JLabel("Invoice: " + returnedReceipt.getBarcode()));
-        infoPanel.add(new JLabel("Date: " + returnedReceipt.getReturnedAt()));
-        infoPanel.add(new JLabel("Cashier: " + returnedReceipt.getUser().getFullname()));
-        infoPanel.add(new JLabel("Client: " + returnedReceipt.getClient().getFullname()));
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.weighty = 0;
-        content.add(infoPanel, gbc);
+        // Meta labels
+        JPanel metaPanel = new JPanel(new GridLayout(2, 1, 0, 4));
+        metaPanel.setBackground(BACKGROUND_COLOR);
+        metaPanel.setBorder(new EmptyBorder(0, 5, 10, 5));
+        metaPanel.add(metaLabel("Returned Date: " + fmtDate(returnedReceipt.getReturnedAt())));
+        metaPanel.add(metaLabel("Staff Fullname: " + returnedReceipt.getUser().getFullname()));
+        metaPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+        content.add(metaPanel);
 
-        String[] columns = {"Barcode", "Item Name", "Qty", "Rent Fee", "Fine Fee"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0);
-        JTable tblReturnedCostume = new JTable(model);
-        tblReturnedCostume.setRowHeight(30);
-        for (ReturnedCostume ret : returnedReceipt.getListReturnedCostume()) {
-            model.addRow(new Object[]{
-                    ret.getRentedCostume().getCostume().getBarcode(),
-                    ret.getRentedCostume().getCostume().getName(),
-                    ret.getQuantity(),
-                    ret.getRentedFee() + " VND",
-                    ret.getFineFee() + " VND"
-            });
-        }
-        JPanel pnl1 = new JPanel(new BorderLayout());
-        pnl1.add(new JLabel("Returned Costumes:"), BorderLayout.NORTH);
-        pnl1.add(new JScrollPane(tblReturnedCostume), BorderLayout.CENTER);
-        gbc.gridy = 1;
-        gbc.weighty = 1;
-        content.add(pnl1, gbc);
+        // Client information label
+        content.add(sectionLabel("Client information:"));
+        content.add(buildClientTable());
+        content.add(Box.createVerticalStrut(12));
 
-        String[] depCols = {"Deposit Name", "Qty", "Value"};
-        DefaultTableModel depModel = new DefaultTableModel(depCols, 0);
-        JTable tblReturnedDeposit = new JTable(depModel);
-        tblReturnedDeposit.setRowHeight(30);
-        for (RentedDeposit rd : depositsToRefund) {
-            depModel.addRow(new Object[]{
-                    rd.getDepositItem().getName(),
-                    rd.getQuantity(),
-                    rd.getDepositAmount() + " VND"
-            });
-        }
-        JPanel pnl2 = new JPanel(new BorderLayout());
-        pnl2.add(new JLabel("Refundable Deposits:"), BorderLayout.NORTH);
-        pnl2.add(new JScrollPane(tblReturnedDeposit), BorderLayout.CENTER);
-        gbc.gridy = 2;
-        gbc.weighty = 1;
-        content.add(pnl2, gbc);
+        // Returned costumes
+        content.add(sectionLabel("Returned costumes"));
+        content.add(buildSection(buildReturnedCostumeModel()));
+        content.add(Box.createVerticalStrut(12));
 
-        float totalDeposit = 0;
-        for (RentedDeposit rentedDeposit : depositsToRefund) {
-            totalDeposit += rentedDeposit.getDepositAmount();
-        }
+        // Returned Damage
+        content.add(sectionLabel("Returned Damage"));
+        content.add(buildSection(buildDamageModel()));
+        content.add(Box.createVerticalStrut(12));
 
-        JPanel totalsPanel = new JPanel(new GridLayout(4, 2, 10, 10));
-        totalsPanel.setBackground(BACKGROUND_COLOR);
-        totalsPanel.setBorder(new EmptyBorder(10, 400, 10, 0));
+        // Returned Deposit
+        content.add(sectionLabel("Returned Deposit"));
+        content.add(buildSection(buildDepositModel()));
 
-        totalsPanel.add(new JLabel("Subtotal Rent:"));
-        totalsPanel.add(new JLabel(returnedReceipt.getTotalRentedFee() + " VND", SwingConstants.RIGHT));
+        mainPanel.add(new JScrollPane(content), BorderLayout.CENTER);
 
-        totalsPanel.add(new JLabel("Subtotal Fine:"));
-        totalsPanel.add(new JLabel(returnedReceipt.getTotalFineFee() + " VND", SwingConstants.RIGHT));
-
-        totalsPanel.add(new JLabel("Refundable Deposit:"));
-        totalsPanel.add(new JLabel(totalDeposit + " VND", SwingConstants.RIGHT));
-
-        float totalPayable = returnedReceipt.getTotalReceiptFee() - totalDeposit;
-        JLabel lblTotal = new JLabel(totalPayable >= 0 ? "CLIENT PAYS:" : "REFUND CLIENT:");
-        lblTotal.setFont(BUTTON_FONT);
-        totalsPanel.add(lblTotal);
-        JLabel lblTotalVal = new JLabel(Math.abs(totalPayable) + " VND", SwingConstants.RIGHT);
-        lblTotalVal.setFont(BUTTON_FONT);
-        lblTotalVal.setForeground(PRIMARY_COLOR);
-        totalsPanel.add(lblTotalVal);
-
-        gbc.gridy = 3;
-        gbc.weighty = 0;
-        content.add(totalsPanel, gbc);
-
-        mainPanel.add(content, BorderLayout.CENTER);
-
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // ── Footer ─────────────────────────────────────────────────────────
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
         footer.setBackground(BACKGROUND_COLOR);
-
-        JButton btnConfirm = createPrimaryButton("Confirm & Print");
-        JButton btnCancel = createSecondaryButton("Cancel");
-
-        btnConfirm.addActionListener(e -> {
-            RentedReceiptDAO rentedReceiptDAO = new RentedReceiptDAO();
-            ReturnedReceiptDAO returnedReceiptDAO = new ReturnedReceiptDAO();
-            CostumeDAO costumeDAO = new CostumeDAO();
-
-            returnedReceiptDAO.addReturnedReceipt(returnedReceipt);
-            rentedReceiptDAO.applyReturnedItemsToRentedReceipt(returnedReceipt);
-
-            for (ReturnedCostume rc : returnedReceipt.getListReturnedCostume()) {
-                Costume costumeToUpdate = new Costume();
-                costumeToUpdate.setBarcode(rc.getRentedCostume().getCostume().getBarcode());
-                costumeToUpdate.setQuantity(rc.getQuantity());
-                costumeDAO.updateQuantity(costumeToUpdate);
-            }
-
-            JOptionPane.showMessageDialog(this, "Transaction completed and receipt printed!");
-            new CashierHomeFrm(u).setVisible(true);
-            this.dispose();
-        });
-
-        btnCancel.addActionListener(e -> {
-            new ReturnProcessingFrm(u, returnedReceipt.getClient(), returnedReceipt.getListReturnedCostume()).setVisible(true);
-            this.dispose();
-        });
-
-        footer.add(btnCancel);
+        JButton btnConfirm = styledBtn("Confirm", new Color(149, 182, 214));
+        JButton btnCancel  = styledBtn("Cancel",  new Color(228, 234, 240));
         footer.add(btnConfirm);
+        footer.add(btnCancel);
         mainPanel.add(footer, BorderLayout.SOUTH);
 
+        btnConfirm.addActionListener(e -> handleConfirm());
+        btnCancel.addActionListener(e -> {
+            new ReturnProcessingFrm(u, returnedReceipt.getClient(),
+                returnedReceipt.getListReturnedCostume()).setVisible(true);
+            dispose();
+        });
+
         add(mainPanel);
+    }
+
+    // ── Table builders ─────────────────────────────────────────────────────
+
+    private JPanel buildClientTable() {
+        Client c = returnedReceipt.getClient();
+        DefaultTableModel m = new DefaultTableModel(
+            new String[]{"ID","Fullname","Address","Tel","Email","Note"}, 0) {
+            public boolean isCellEditable(int r, int col) { return false; }
+        };
+        m.addRow(new Object[]{c.getId(), c.getFullname(), c.getAddress(),
+            c.getTel(), c.getEmail(), c.getNote()});
+        return buildSection(m);
+    }
+
+    private DefaultTableModel buildReturnedCostumeModel() {
+        DefaultTableModel m = new DefaultTableModel(
+            new String[]{"ID","Name","Rented Date","Rented Quantity","Returning Quantity","Total Rented Fee"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        for (ReturnedCostume rc : returnedReceipt.getListReturnedCostume()) {
+            m.addRow(new Object[]{
+                rc.getRentedCostume().getCostume().getBarcode(),
+                rc.getRentedCostume().getCostume().getName(),
+                fmtDate(rc.getRentedCostume().getRentedAt()),
+                rc.getRentedCostume().getQuantity(),
+                rc.getQuantity(),
+                rc.getRentedFee()
+            });
+        }
+        return m;
+    }
+
+    private DefaultTableModel buildDamageModel() {
+        DefaultTableModel m = new DefaultTableModel(
+            new String[]{"Costume ID","Costume Name","Damage name","Damage Costume Quantity","Total Fine Fee","Note"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        for (ReturnedCostume rc : returnedReceipt.getListReturnedCostume()) {
+            if (rc.getListReturnedDamage() == null) continue;
+            for (ReturnedDamage rd : rc.getListReturnedDamage()) {
+                m.addRow(new Object[]{
+                    rc.getRentedCostume().getCostume().getBarcode(),
+                    rc.getRentedCostume().getCostume().getName(),
+                    rd.getDamage().getName(),
+                    rd.getQuantity(),
+                    rd.getFee() * rd.getQuantity(),
+                    rd.getDamage().getNote()
+                });
+            }
+        }
+        return m;
+    }
+
+    private DefaultTableModel buildDepositModel() {
+        DefaultTableModel m = new DefaultTableModel(
+            new String[]{"ID","Name","Deposit Date","Quantity","Total Value","Note"}, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
+        };
+        for (RentedDeposit rd : depositsToRefund) {
+            m.addRow(new Object[]{
+                rd.getId(),
+                rd.getDepositItem().getName(),
+                fmtDate(rd.getRentedAt()),
+                rd.getQuantity(),
+                rd.getDepositItem().getValue() * rd.getQuantity(),
+                rd.getNote()
+            });
+        }
+        return m;
+    }
+
+    // ── Confirm action ─────────────────────────────────────────────────────
+    private void handleConfirm() {
+        RentedReceiptDAO  rDao   = new RentedReceiptDAO();
+        ReturnedReceiptDAO retDao = new ReturnedReceiptDAO();
+        CostumeDAO        cDao   = new CostumeDAO();
+
+        retDao.addReturnedReceipt(returnedReceipt);
+        rDao.updateRentedStatus(new RentedReceipt());
+        for (ReturnedCostume rc : returnedReceipt.getListReturnedCostume()) {
+            cDao.updateQuantity(rc.getRentedCostume().getCostume().getBarcode(), rc.getQuantity());
+        }
+        rDao.updateDepositStatus(new RentedReceipt());
+
+        JOptionPane.showMessageDialog(this, "Giao dich hoan tat va phieu da duoc in!");
+        new CashierHomeFrm(u).setVisible(true);
+        dispose();
+    }
+
+    // ── Layout helpers ─────────────────────────────────────────────────────
+    private JPanel buildSection(DefaultTableModel m) {
+        JTable table = new JTable(m);
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(Color.WHITE);
+        table.setFont(LABEL_FONT);
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(new LineBorder(new Color(180, 195, 210), 1));
+        int rows = Math.min(m.getRowCount() + 1, 5);
+        scroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, rows * 31 + 26));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(BACKGROUND_COLOR);
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height + 60));
+        return panel;
+    }
+
+    private JLabel sectionLabel(String text) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(LABEL_FONT);
+        lbl.setForeground(TEXT_COLOR);
+        lbl.setBorder(new EmptyBorder(4, 5, 4, 0));
+        return lbl;
+    }
+
+    private JLabel metaLabel(String text) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(LABEL_FONT);
+        lbl.setForeground(TEXT_COLOR);
+        return lbl;
+    }
+
+    private JButton styledBtn(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        btn.setBackground(bg);
+        btn.setForeground(TEXT_COLOR);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 200, 220), 1),
+            BorderFactory.createEmptyBorder(10, 40, 10, 40)
+        ));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    private String fmtDate(Date d) {
+        return d == null ? "" : new SimpleDateFormat("dd/MM/yyyy").format(d);
     }
 }

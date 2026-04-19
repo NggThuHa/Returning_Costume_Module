@@ -12,7 +12,7 @@ public class CashierHomeFrm extends BaseFrm {
         super("Cashier Home - Costume Rental System");
         this.u = user;
         initComponents();
-        setSize(500, 400);
+        setSize(600, 480);
         centerWindow();
     }
 
@@ -20,16 +20,21 @@ public class CashierHomeFrm extends BaseFrm {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(BACKGROUND_COLOR);
 
-        JPanel header = createHeader("Welcome, " + u.getFullname());
-        mainPanel.add(header, BorderLayout.NORTH);
+        // Title
+        JLabel lblTitle = new JLabel("Cashier\u2019s home", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.PLAIN, 36));
+        lblTitle.setForeground(TEXT_COLOR);
+        lblTitle.setBorder(new EmptyBorder(50, 0, 30, 0));
+        mainPanel.add(lblTitle, BorderLayout.NORTH);
 
-        JPanel body = new JPanel(new GridLayout(3, 1, 20, 20));
+        // Buttons panel - centered
+        JPanel body = new JPanel(new GridLayout(3, 1, 0, 20));
         body.setBackground(BACKGROUND_COLOR);
-        body.setBorder(new EmptyBorder(40, 60, 40, 60));
+        body.setBorder(new EmptyBorder(10, 80, 60, 80));
 
-        JButton btnRent = createSecondaryButton("Rent Costume");
-        JButton btnReturn = createPrimaryButton("Return Costume & Payment");
-        JButton btnLogout = createSecondaryButton("Logout");
+        JButton btnRent   = makeMenuButton("Rent costume",   new Color(149, 182, 214));
+        JButton btnReturn = makeMenuButton("Return costume",  new Color(149, 182, 214));
+        JButton btnLogout = makeMenuButton("Logout",          new Color(228, 234, 240));
 
         btnReturn.addActionListener(e -> {
             new SearchClientFrm(u).setVisible(true);
@@ -47,5 +52,21 @@ public class CashierHomeFrm extends BaseFrm {
         mainPanel.add(body, BorderLayout.CENTER);
 
         add(mainPanel);
+    }
+
+    private JButton makeMenuButton(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 20));
+        btn.setBackground(bg);
+        btn.setForeground(TEXT_COLOR);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(true);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(190, 210, 230), 1),
+            BorderFactory.createEmptyBorder(14, 20, 14, 20)
+        ));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        btn.setHorizontalAlignment(SwingConstants.CENTER);
+        return btn;
     }
 }

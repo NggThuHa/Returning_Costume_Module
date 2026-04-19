@@ -11,46 +11,65 @@ public class LoginFrm extends BaseFrm {
     private JPasswordField inPassword;
 
     public LoginFrm() {
-        super("Dang nhap - He thong tra do va thanh toan");
+        super("Login - He thong tra do va thanh toan");
         initComponents();
-        setSize(460, 360);
+        setSize(500, 400);
         centerWindow();
     }
 
     private void initComponents() {
         JPanel mainPanel = new JPanel(new GridBagLayout());
         mainPanel.setBackground(BACKGROUND_COLOR);
-        mainPanel.setBorder(new EmptyBorder(30, 30, 30, 30));
+        mainPanel.setBorder(new EmptyBorder(40, 60, 40, 60));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.insets = new Insets(10, 0, 10, 0);
+        gbc.insets = new Insets(10, 5, 10, 5);
 
-        JLabel lblTitle = new JLabel("DANG NHAP HE THONG", SwingConstants.CENTER);
-        lblTitle.setFont(TITLE_FONT);
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+        // Title
+        JLabel lblTitle = new JLabel("Login", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.PLAIN, 36));
+        lblTitle.setForeground(TEXT_COLOR);
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2; gbc.weightx = 1;
         mainPanel.add(lblTitle, gbc);
 
-        gbc.gridy = 1; gbc.gridwidth = 1;
-        mainPanel.add(new JLabel("Ten dang nhap:"), gbc);
-        inUsername = new JTextField(15);
-        gbc.gridx = 1;
+        // Username row
+        gbc.gridy = 1; gbc.gridwidth = 1; gbc.weightx = 0;
+        gbc.insets = new Insets(20, 5, 10, 15);
+        JLabel lblUser = new JLabel("Username");
+        lblUser.setFont(LABEL_FONT);
+        mainPanel.add(lblUser, gbc);
+
+        inUsername = new JTextField(20);
+        inUsername.setFont(LABEL_FONT);
+        inUsername.setBorder(BorderFactory.createLineBorder(new Color(200, 210, 225), 1));
+        inUsername.setPreferredSize(new Dimension(280, 36));
+        gbc.gridx = 1; gbc.weightx = 1;
         mainPanel.add(inUsername, gbc);
 
-        gbc.gridx = 0; gbc.gridy = 2;
-        mainPanel.add(new JLabel("Mat khau:"), gbc);
-        inPassword = new JPasswordField(15);
-        gbc.gridx = 1;
+        // Password row
+        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0;
+        gbc.insets = new Insets(10, 5, 10, 15);
+        JLabel lblPass = new JLabel("Password");
+        lblPass.setFont(LABEL_FONT);
+        mainPanel.add(lblPass, gbc);
+
+        inPassword = new JPasswordField(20);
+        inPassword.setFont(LABEL_FONT);
+        inPassword.setBorder(BorderFactory.createLineBorder(new Color(200, 210, 225), 1));
+        inPassword.setPreferredSize(new Dimension(280, 36));
+        gbc.gridx = 1; gbc.weightx = 1;
         mainPanel.add(inPassword, gbc);
 
-        JLabel lblHint = new JLabel("Tai khoan kich ban: A / a@123", SwingConstants.CENTER);
-        lblHint.setForeground(SECONDARY_TEXT_COLOR);
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        gbc.insets = new Insets(5, 0, 0, 0);
-        mainPanel.add(lblHint, gbc);
-
-        JButton subLogin = createPrimaryButton("Dang nhap");
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
-        gbc.insets = new Insets(20, 0, 0, 0);
+        // Login button
+        JButton subLogin = new JButton("Login");
+        subLogin.setFont(new Font("SansSerif", Font.PLAIN, 18));
+        subLogin.setBackground(new Color(149, 182, 214));
+        subLogin.setForeground(TEXT_COLOR);
+        subLogin.setFocusPainted(false);
+        subLogin.setBorder(BorderFactory.createEmptyBorder(10, 40, 10, 40));
+        subLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2; gbc.weightx = 1;
+        gbc.insets = new Insets(25, 60, 10, 60);
         mainPanel.add(subLogin, gbc);
 
         subLogin.addActionListener(e -> {
@@ -60,7 +79,6 @@ public class LoginFrm extends BaseFrm {
                 JOptionPane.showMessageDialog(this, "Vui long nhap day du ten dang nhap va mat khau.");
                 return;
             }
-
             User user = new User();
             user.setUsername(username);
             user.setPassword(password);
@@ -68,9 +86,13 @@ public class LoginFrm extends BaseFrm {
                 new CashierHomeFrm(user).setVisible(true);
                 this.dispose();
             } else {
-                JOptionPane.showMessageDialog(this, "Dang nhap that bai. Vui long dung tai khoan A va mat khau a@123.");
+                JOptionPane.showMessageDialog(this, "Dang nhap that bai. Kich ban: cashier / a@123");
             }
         });
+
+        // Enter key on password
+        inPassword.addActionListener(e -> subLogin.doClick());
+
         add(mainPanel, BorderLayout.CENTER);
     }
 }

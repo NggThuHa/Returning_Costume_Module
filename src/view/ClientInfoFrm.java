@@ -2,295 +2,227 @@ package view;
 
 import dao.RentedReceiptDAO;
 import dao.ReturnedReceiptDAO;
-import model.Client;
-import model.RentedCostume;
-import model.RentedDeposit;
-import model.RentedReceipt;
-import model.ReturnedCostume;
-import model.ReturnedReceipt;
-import model.User;
-
-import javax.swing.JButton;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTable;
-import javax.swing.border.EmptyBorder;
+import model.*;
+import javax.swing.*;
+import javax.swing.border.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
+import java.awt.*;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
+import java.util.*;
 import java.util.List;
 
 public class ClientInfoFrm extends BaseFrm {
     private final User u;
     private final Client client;
-    private final List<RentedReceipt> listRentedReceipt;
-    private final List<RentedCostume> listRentedCostume;
-    private final List<RentedDepositView> listRentedDeposit;
-    private final List<ReturnedCostume> listReturnedHistory;
-
-    private JTable tblRentedCostume;
+    private final List<RentedCostume>  listRenting   = new ArrayList<>();
+    private final List<ReturnedCostume> listReturned = new ArrayList<>();
+    private final List<RentedDeposit>  listDeposits  = new ArrayList<>();
+    private DefaultTableModel rentingModel;
 
     public ClientInfoFrm(User user, Client client) {
-        super("Thong tin khach hang - Tra trang phuc");
+        super("Client Information - Return Costume");
         this.u = user;
         this.client = client;
-
-        listRentedReceipt = new RentedReceiptDAO().searchByClient(client);
-        listRentedCostume = new ArrayList<>();
-        listRentedDeposit = new ArrayList<>();
-        listReturnedHistory = new ArrayList<>();
-
-        for (RentedReceipt rentedReceipt : listRentedReceipt) {
-            if (rentedReceipt.getListRentedCostume() != null) {
-                listRentedCostume.addAll(rentedReceipt.getListRentedCostume());
-            }
-            if (rentedReceipt.getListRentedDeposit() != null) {
-                for (RentedDeposit rentedDeposit : rentedReceipt.getListRentedDeposit()) {
-                    listRentedDeposit.add(new RentedDepositView(rentedDeposit, rentedReceipt.getRentedAt()));
-                }
-            }
-        }
-
-        List<ReturnedReceipt> returnedReceipts = new ReturnedReceiptDAO().searchByClient(client);
-        for (ReturnedReceipt returnedReceipt : returnedReceipts) {
-            if (returnedReceipt.getListReturnedCostume() != null) {
-                listReturnedHistory.addAll(returnedReceipt.getListReturnedCostume());
-            }
-        }
-
+        loadData();
         initComponents();
-        setSize(1200, 820);
+        setSize(1100, 820);
         centerWindow();
     }
 
+    private void loadData() {
+        for (RentedReceipt rr : new RentedReceiptDAO().searchByClient(client)) {
+            if (rr.getListRentedCostume() != null)  listRenting.addAll(rr.getListRentedCostume());
+            if (rr.getListRentedDeposit() != null)  listDeposits.addAll(rr.getListRentedDeposit());
+        }
+        for (ReturnedReceipt ret : new ReturnedReceiptDAO().searchByClient(client)) {
+            if (ret.getListReturnedCostume() != null) listReturned.addAll(ret.getListReturnedCostume());
+        }
+    }
+
     private void initComponents() {
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 0));
         mainPanel.setBackground(BACKGROUND_COLOR);
 
-        JPanel header = createHeader("Thong tin khach hang");
-        mainPanel.add(header, BorderLayout.NORTH);
+        // Title
+        JLabel lblTitle = new JLabel("Client\u2019s Infomation", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.PLAIN, 30));
+        lblTitle.setBorder(new EmptyBorder(25, 0, 10, 0));
+        mainPanel.add(lblTitle, BorderLayout.NORTH);
 
-        JPanel content = new JPanel(new GridLayout(4, 1, 10, 10));
+        // Scrollable centre
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setBackground(BACKGROUND_COLOR);
-        content.setBorder(new EmptyBorder(20, 20, 20, 20));
+        content.setBorder(new EmptyBorder(5, 20, 10, 20));
 
-        content.add(buildClientInfoPanel());
-        content.add(buildRentedCostumePanel());
-        content.add(buildReturnedHistoryPanel());
-        content.add(buildDepositPanel());
+        content.add(buildClientTable());
+        content.add(Box.createVerticalStrut(10));
+        content.add(buildSection("Renting costumes",  buildRentingModel(),  false));
+        content.add(Box.createVerticalStrut(10));
+        content.add(buildSection("Returned costumes", buildReturnedModel(), false));
+        content.add(Box.createVerticalStrut(10));
+        content.add(buildSection("Deposits",          buildDepositModel(),  false));
 
-        mainPanel.add(content, BorderLayout.CENTER);
+        mainPanel.add(new JScrollPane(content), BorderLayout.CENTER);
 
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        // Footer
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
         footer.setBackground(BACKGROUND_COLOR);
-        JButton btnNext = createPrimaryButton("Tiep");
-        JButton btnCancel = createSecondaryButton("Huy");
+        JButton btnNext   = styledBtn("Next",   new Color(149, 182, 214));
+        JButton btnCancel = styledBtn("Cancel", new Color(228, 234, 240));
+        footer.add(btnNext);
+        footer.add(btnCancel);
+        mainPanel.add(footer, BorderLayout.SOUTH);
 
         btnNext.addActionListener(e -> handleNext());
-        btnCancel.addActionListener(e -> {
-            new SearchClientFrm(u).setVisible(true);
-            this.dispose();
-        });
-
-        footer.add(btnCancel);
-        footer.add(btnNext);
-        mainPanel.add(footer, BorderLayout.SOUTH);
+        btnCancel.addActionListener(e -> { new SearchClientFrm(u).setVisible(true); dispose(); });
 
         add(mainPanel);
     }
 
-    private JPanel buildClientInfoPanel() {
-        String[] columns = {"Ma", "Ho ten", "Dia chi", "So dien thoai", "Email", "Ghi chu"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+    // ── Client info table (1 row) ─────────────────────────────────────────
+    private JPanel buildClientTable() {
+        String[] cols = {"ID", "Fullname", "Address", "Tel", "Email", "Note"};
+        DefaultTableModel m = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
-        model.addRow(new Object[]{
-                client.getId(),
-                client.getFullname(),
-                client.getAddress(),
-                client.getTel(),
-                client.getEmail(),
-                client.getNote()
-        });
-
-        JTable table = new JTable(model);
-        table.setRowHeight(28);
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.add(new JLabel("Thong tin khach hang"), BorderLayout.NORTH);
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
-        return panel;
+        m.addRow(new Object[]{client.getId(), client.getFullname(),
+            client.getAddress(), client.getTel(), client.getEmail(), client.getNote()});
+        return buildSection(null, m, false);
     }
 
-    private JPanel buildRentedCostumePanel() {
-        String[] columns = {"Ma", "Ten trang phuc", "Ngay muon", "Gia coc", "Gia muon", "So luong muon", "So luong tra"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return column == 6;
-            }
+    // ── Renting costumes ──────────────────────────────────────────────────
+    private DefaultTableModel buildRentingModel() {
+        String[] cols = {"ID", "Name", "Rented Date", "Deposit", "Rental Fee",
+                         "Rented Quantity", "Returning Quantity"};
+        rentingModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return c == 6; }
         };
-
-        for (RentedCostume rentedCostume : listRentedCostume) {
-            model.addRow(new Object[]{
-                    rentedCostume.getCostume().getBarcode(),
-                    rentedCostume.getCostume().getName(),
-                    formatDate(rentedCostume.getRentedAt()),
-                    formatAmount(rentedCostume.getCostume().getPrice()),
-                    formatAmount(rentedCostume.getPrice()),
-                    rentedCostume.calculateRemainedQuantity(),
-                    ""
+        for (RentedCostume rc : listRenting) {
+            rentingModel.addRow(new Object[]{
+                rc.getCostume().getBarcode(),
+                rc.getCostume().getName(),
+                fmtDate(rc.getRentedAt()),
+                rc.getCostume().getPrice(),
+                rc.getPrice(),
+                rc.calculateRemainedQuantity(),
+                ""
             });
         }
-
-        tblRentedCostume = new JTable(model);
-        tblRentedCostume.setRowHeight(28);
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.add(new JLabel("Danh sach trang phuc dang muon"), BorderLayout.NORTH);
-        panel.add(new JScrollPane(tblRentedCostume), BorderLayout.CENTER);
-        return panel;
+        return rentingModel;
     }
 
-    private JPanel buildReturnedHistoryPanel() {
-        String[] columns = {"Ma", "Ten trang phuc", "Ngay muon", "Ngay tra", "So luong", "Tien thue", "Tien phat"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+    // ── Returned costumes ─────────────────────────────────────────────────
+    private DefaultTableModel buildReturnedModel() {
+        String[] cols = {"ID", "Name", "Rented Date", "Returned Date",
+                         "Returned Quantity", "Total Rentel Fee", "Total Fine Fee"};
+        DefaultTableModel m = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
-
-        for (ReturnedCostume returnedCostume : listReturnedHistory) {
-            model.addRow(new Object[]{
-                    returnedCostume.getRentedCostume().getCostume().getBarcode(),
-                    returnedCostume.getRentedCostume().getCostume().getName(),
-                    formatDate(returnedCostume.getRentedCostume().getRentedAt()),
-                    formatDate(returnedCostume.getReturnedAt()),
-                    returnedCostume.getQuantity(),
-                    formatAmount(returnedCostume.getRentedFee()),
-                    formatAmount(returnedCostume.getFineFee())
+        for (ReturnedCostume rc : listReturned) {
+            m.addRow(new Object[]{
+                rc.getRentedCostume().getCostume().getBarcode(),
+                rc.getRentedCostume().getCostume().getName(),
+                fmtDate(rc.getRentedCostume().getRentedAt()),
+                fmtDate(rc.getReturnedAt()),
+                rc.getQuantity(),
+                rc.getRentedFee(),
+                rc.getFineFee()
             });
         }
-
-        JTable table = new JTable(model);
-        table.setRowHeight(28);
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.add(new JLabel("Danh sach trang phuc da tra"), BorderLayout.NORTH);
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
-        return panel;
+        return m;
     }
 
-    private JPanel buildDepositPanel() {
-        String[] columns = {"Ma", "Ten coc", "Ngay coc", "So luong coc", "So tien", "Ghi chu"};
-        DefaultTableModel model = new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
+    // ── Deposits ──────────────────────────────────────────────────────────
+    private DefaultTableModel buildDepositModel() {
+        String[] cols = {"ID", "Name", "Deposit Date", "Quantity", "Value", "Note"};
+        DefaultTableModel m = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
-
-        for (RentedDepositView rentedDepositView : listRentedDeposit) {
-            model.addRow(new Object[]{
-                    rentedDepositView.rentedDeposit.getId(),
-                    rentedDepositView.rentedDeposit.getDepositItem().getName(),
-                    formatDate(rentedDepositView.rentedAt),
-                    rentedDepositView.rentedDeposit.getQuantity(),
-                    formatAmount(rentedDepositView.rentedDeposit.getDepositAmount()),
-                    rentedDepositView.rentedDeposit.getNote()
+        for (RentedDeposit rd : listDeposits) {
+            m.addRow(new Object[]{
+                rd.getId(),
+                rd.getDepositItem().getName(),
+                fmtDate(rd.getRentedAt()),
+                rd.getQuantity(),
+                rd.getDepositItem().getValue(),
+                rd.getNote()
             });
         }
-
-        JTable table = new JTable(model);
-        table.setRowHeight(28);
-
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Color.WHITE);
-        panel.add(new JLabel("Danh sach do dang coc"), BorderLayout.NORTH);
-        panel.add(new JScrollPane(table), BorderLayout.CENTER);
-        return panel;
+        return m;
     }
 
+    // ── handleNext ────────────────────────────────────────────────────────
     private void handleNext() {
         List<ReturnedCostume> toReturn = new ArrayList<>();
-
-        for (int i = 0; i < tblRentedCostume.getRowCount(); i++) {
-            int returnQty = 0;
-            String rawValue = String.valueOf(tblRentedCostume.getValueAt(i, 6)).trim();
-            if (rawValue.isEmpty()) {
-                continue;
-            }
-
-            try {
-                returnQty = Integer.parseInt(rawValue);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "So luong tra khong hop le.");
+        for (int i = 0; i < rentingModel.getRowCount(); i++) {
+            String raw = String.valueOf(rentingModel.getValueAt(i, 6)).trim();
+            if (raw.isEmpty()) continue;
+            int qty;
+            try { qty = Integer.parseInt(raw); } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "So luong tra khong hop le o hang " + (i+1));
                 return;
             }
-
-            if (returnQty < 1) {
-                JOptionPane.showMessageDialog(this, "So luong toi thieu la 1");
+            int remained = listRenting.get(i).calculateRemainedQuantity();
+            if (qty < 1 || qty > remained) {
+                JOptionPane.showMessageDialog(this, "So luong tra khong hop le o hang " + (i+1));
                 return;
             }
-
-            if (returnQty > 0) {
-                int remained = listRentedCostume.get(i).calculateRemainedQuantity();
-                if (returnQty > remained) {
-                    JOptionPane.showMessageDialog(this, "So luong tra khong hop le.");
-                    return;
-                }
-                ReturnedCostume returnedCostume = new ReturnedCostume();
-                returnedCostume.setRentedCostume(listRentedCostume.get(i));
-                returnedCostume.setQuantity(returnQty);
-                returnedCostume.setReturnedAt(new Date());
-                toReturn.add(returnedCostume);
-            }
+            ReturnedCostume rc = new ReturnedCostume();
+            rc.setRentedCostume(listRenting.get(i));
+            rc.setQuantity(qty);
+            rc.setReturnedAt(new Date());
+            rc.setListReturnedDamage(new ArrayList<>());
+            toReturn.add(rc);
         }
-
         if (toReturn.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Vui long dien so luong tra");
+            JOptionPane.showMessageDialog(this, "Vui long dien so luong tra.");
             return;
         }
-
         new ReturnProcessingFrm(u, client, toReturn).setVisible(true);
-        this.dispose();
+        dispose();
     }
 
-    private String formatDate(Date date) {
-        if (date == null) {
-            return "";
+    // ── Helpers ───────────────────────────────────────────────────────────
+    private JPanel buildSection(String title, DefaultTableModel m, boolean editable) {
+        JTable table = new JTable(m);
+        table.setRowHeight(30);
+        table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+        table.getTableHeader().setBackground(Color.WHITE);
+        table.setFont(LABEL_FONT);
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(new LineBorder(new Color(180, 195, 210), 1));
+        int rows = Math.min(m.getRowCount() + 1, 5);
+        scroll.setPreferredSize(new Dimension(Integer.MAX_VALUE, rows * 31 + 25));
+
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBackground(BACKGROUND_COLOR);
+        if (title != null) {
+            JLabel lbl = new JLabel(title);
+            lbl.setFont(LABEL_FONT);
+            panel.add(lbl, BorderLayout.NORTH);
         }
-        return new SimpleDateFormat("dd/MM/yyyy").format(date);
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height + 80));
+        return panel;
     }
 
-    private String formatAmount(float value) {
-        if (value == (long) value) {
-            return String.valueOf((long) value);
-        }
-        return String.format("%.2f", value);
+    private JButton styledBtn(String text, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        btn.setBackground(bg);
+        btn.setForeground(TEXT_COLOR);
+        btn.setFocusPainted(false);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 200, 220), 1),
+            BorderFactory.createEmptyBorder(10, 40, 10, 40)
+        ));
+        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        return btn;
     }
 
-    private static class RentedDepositView {
-        private final RentedDeposit rentedDeposit;
-        private final Date rentedAt;
-
-        private RentedDepositView(RentedDeposit rentedDeposit, Date rentedAt) {
-            this.rentedDeposit = rentedDeposit;
-            this.rentedAt = rentedAt;
-        }
+    private String fmtDate(Date d) {
+        return d == null ? "" : new SimpleDateFormat("dd/MM/yyyy").format(d);
     }
 }
